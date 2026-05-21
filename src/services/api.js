@@ -46,5 +46,41 @@ export const hireflowAPI = {
     }),
 
   generateBrief: (analysis, scorecard) =>
-    post('generate-brief', { jobTitle: analysis.jobTitle, analysis, scorecard })
+    post('generate-brief', { jobTitle: analysis.jobTitle, analysis, scorecard }),
+
+  parseResume: (resumeText) =>
+  post('parse-resume', { resumeText }),
+
+    parseResumePDF: (pdfBase64) =>
+  post('parse-resume-pdf', { pdfBase64 }),
+
+    scoreCandidate: (scorecard, candidateBackground, candidateName) =>
+  post('score-candidate', { scorecard, candidateBackground, candidateName }),
+}
+
+export const historyAPI = {
+  saveRun: (runData) =>
+    post('runs', runData),
+
+  getRuns: async () => {
+    const response = await fetch(`${API_URL}/api/runs`)
+    if (!response.ok) throw new Error('Failed to fetch runs')
+    const data = await response.json()
+    return data.data
+  },
+
+  getRunById: async (id) => {
+    const response = await fetch(`${API_URL}/api/runs/${id}`)
+    if (!response.ok) throw new Error('Failed to fetch run')
+    const data = await response.json()
+    return data.data
+  },
+
+  deleteRun: async (id) => {
+    const response = await fetch(`${API_URL}/api/runs/${id}`, {
+      method: 'DELETE'
+    })
+    if (!response.ok) throw new Error('Failed to delete run')
+    return response.json()
+  }
 }
