@@ -56,12 +56,12 @@ src/
 ### Prerequisites
 
 - Node.js 18+
-- [HireFlow Backend](https://github.com/YOUR_USERNAME/hireflow-backend) running on port 3001
+- [HireFlow Backend](https://github.com/Kunald199/hireflow-backend) running on port 3001
 
 ### Install
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/hireflow-frontend
+git clone https://github.com/Kunald199/hireflow-frontend
 cd hireflow-frontend
 npm install
 ```
