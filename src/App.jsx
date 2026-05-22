@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState,useRef } from 'react'
 import { hireflowAPI, historyAPI } from './services/api'
 import LoadingSpinner from './components/LoadingSpinner'
 import ErrorMessage from './components/ErrorMessage'
@@ -10,6 +10,7 @@ import OutreachResult from './components/steps/OutreachResult'
 import QuestionsResult from './components/steps/QuestionsResult'
 import BriefResult from './components/steps/BriefResult'
 import ScoringResult from './components/steps/ScoringResult'
+
 
 const STEPS = [
   { key: 'analysis', label: 'JD Analysis' },
@@ -37,6 +38,7 @@ export default function App() {
   const [history, setHistory] = useState([])
   const [showHistory, setShowHistory] = useState(false)
   const [loadingHistory, setLoadingHistory] = useState(false)
+  const historyRef = useRef(null)
 
   function getStepStatus(key) {
     if (results[key]) return 'complete'
@@ -108,41 +110,51 @@ function handleResumeParsed(parsed) {
     }
   }
 
-  async function saveCurrentRun() {
-    if (!results.analysis) return
-    setSaving(true)
-    try {
-      await historyAPI.saveRun({
-        jobTitle: results.analysis.jobTitle,
-        companyName,
-        jobDescription,
-        analysis: results.analysis,
-        scorecard: results.scorecard,
-        questions: results.questions,
-        outreach: results.outreach,
-        brief: results.brief
-      })
-      setSaved(true)
-      setTimeout(() => setSaved(false), 3000)
-    } catch (err) {
-      setError('Failed to save run: ' + err.message)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function loadHistory() {
-    setLoadingHistory(true)
+async function saveCurrentRun() {
+  if (!results.analysis) return
+  setSaving(true)
+  console.log('candidateName state:', candidateName)
+  console.log('companyName state:', companyName)
+  try {
+    await historyAPI.saveRun({
+      jobTitle: results.analysis.jobTitle,
+      companyName,
+      candidateName,
+      jobDescription,
+      analysis: results.analysis,
+      scorecard: results.scorecard,
+      questions: results.questions,
+      outreach: results.outreach,
+      brief: results.brief
+    })
+    setSaved(true)
+    setTimeout(() => setSaved(false), 3000)
+    // Auto refresh history if panel is open
+    const runs = await historyAPI.getRuns()
+    setHistory(runs)
     setShowHistory(true)
-    try {
-      const runs = await historyAPI.getRuns()
-      setHistory(runs)
-    } catch (err) {
-      setError('Failed to load history')
-    } finally {
-      setLoadingHistory(false)
-    }
+  } catch (err) {
+    setError('Failed to save run: ' + err.message)
+  } finally {
+    setSaving(false)
   }
+}
+
+async function loadHistory() {
+  setLoadingHistory(true)
+  setShowHistory(true)
+  try {
+    const runs = await historyAPI.getRuns()
+    setHistory(runs)
+    setTimeout(() => {
+      historyRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }, 100)
+  } catch (err) {
+    setError('Failed to load history')
+  } finally {
+    setLoadingHistory(false)
+  }
+}
 
   async function loadRun(id) {
     setShowHistory(false)
@@ -369,59 +381,61 @@ function handleResumeParsed(parsed) {
         )}
 
         {/* History Panel */}
-        {showHistory && (
-          <div className="bg-white rounded-xl border border-slate-200 p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-semibold text-slate-800">📋 Saved Runs</h3>
-              <button
-                onClick={() => setShowHistory(false)}
-                className="text-slate-400 hover:text-slate-600 text-sm"
-              >
-                Close
-              </button>
-            </div>
+        {/* History Panel */}
+{showHistory && (
+  <div ref={historyRef} className="bg-white rounded-xl border border-slate-200 p-6">
+    <div className="flex justify-between items-center mb-4">
+      <h3 className="font-semibold text-slate-800">📋 Saved Runs</h3>
+      <button
+        onClick={() => setShowHistory(false)}
+        className="text-slate-400 hover:text-slate-600 text-sm"
+      >
+        Close
+      </button>
+    </div>
 
-            {loadingHistory && <LoadingSpinner message="Loading history..." />}
+    {loadingHistory && <LoadingSpinner message="Loading history..." />}
 
-            {!loadingHistory && history.length === 0 && (
-              <p className="text-slate-500 text-sm text-center py-8">
-                No saved runs yet. Run the pipeline and hit Save.
+    {!loadingHistory && history.length === 0 && (
+      <p className="text-slate-500 text-sm text-center py-8">
+        No saved runs yet. Run the pipeline and hit Save.
+      </p>
+    )}
+
+    {!loadingHistory && history.length > 0 && (
+      <div className="space-y-2">
+        {history.map(run => (
+          <div
+            key={run.id}
+            className="flex items-center justify-between p-3 border border-slate-100 rounded-lg hover:bg-slate-50"
+          >
+            <div
+              className="flex-1 cursor-pointer"
+              onClick={() => loadRun(run.id)}
+            >
+              <p className="text-sm font-medium text-brand-600 hover:underline">
+                {run.job_title}
               </p>
-            )}
-
-            {!loadingHistory && history.length > 0 && (
-              <div className="space-y-2">
-                {history.map(run => (
-                  <div
-                    key={run.id}
-                    className="flex items-center justify-between p-3 border border-slate-100 rounded-lg hover:bg-slate-50"
-                  >
-                    <div
-                      className="flex-1 cursor-pointer"
-                      onClick={() => loadRun(run.id)}
-                    >
-                      <p className="text-sm font-medium text-brand-600 hover:underline">
-                        {run.job_title}
-                      </p>
-                      <p className="text-xs text-slate-400">
-                        {run.company_name && `${run.company_name} · `}
-                        {new Date(run.created_at).toLocaleDateString('en-US', {
-                          month: 'short', day: 'numeric', year: 'numeric'
-                        })}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => handleDeleteRun(run.id)}
-                      className="text-xs text-red-400 hover:text-red-600 ml-4"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
+              <p className="text-xs text-slate-400">
+                {run.candidate_name && `👤 ${run.candidate_name} · `}
+                {run.company_name && `${run.company_name} · `}
+                {new Date(run.created_at).toLocaleDateString('en-US', {
+                  month: 'short', day: 'numeric', year: 'numeric'
+                })}
+              </p>
+            </div>
+            <button
+              onClick={() => handleDeleteRun(run.id)}
+              className="text-xs text-red-400 hover:text-red-600 ml-4"
+            >
+              Delete
+            </button>
           </div>
-        )}
+        ))}
+      </div>
+    )}
+  </div>
+)}
       </main>
     </div>
   )
